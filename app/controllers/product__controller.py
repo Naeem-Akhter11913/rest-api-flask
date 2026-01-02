@@ -9,9 +9,10 @@ from ..schema.product__schema import ProductSchema
 from ..extention import mongo
 
 from datetime import datetime
-
+from ..autn_middleware.auth__middleware import auth__required
 # products ye ek table name hai aap yaha se kuch bhi de sakte hot database me is name ka collection ban jayega 
 
+from flask_jwt_extended import jwt_required , get_jwt_identity , get_jwt
 
 
 def create__product():
@@ -50,8 +51,12 @@ def create__product():
             "message": f"Something went wrong {str(e)}"
         }),500
 
-
+@jwt_required()
+@auth__required
 def findAll__product():
+    user_id = get_jwt_identity()   # <-- user _id
+    claims = get_jwt() 
+    print(user_id)
     try:
          products = mongo.db.ProductSchema.find()
          return jsonify({
