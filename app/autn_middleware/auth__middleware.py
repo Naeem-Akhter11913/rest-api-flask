@@ -14,11 +14,11 @@ def auth__required(fn):
             }), 401
         token = token.split(' ')[1]
 
-        # if token != os.getenv('SECURITY_KEY'):
-        #     return jsonify({
-        #         'status': False,
-        #         'message': 'Unauthorized access'
-        #     }), 401
+        if token != os.getenv('SECURITY_KEY'):
+            return jsonify({
+                'status': False,
+                'message': 'Unauthorized access'
+            }), 401
      
         return fn(*args, **kwargs)
     return wrapper
