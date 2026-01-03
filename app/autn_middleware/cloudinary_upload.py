@@ -1,7 +1,8 @@
 from functools import wraps
 from flask import request, jsonify, g
 from ..config.cloudinary_config import cloudinary   # ensures config is loaded
-
+import cloudinary
+import cloudinary.uploader 
 
 def cloudinary_upload(field_name="image"):
     def decorator(f):

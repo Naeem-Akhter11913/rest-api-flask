@@ -2,10 +2,12 @@ from pymongo.errors import PyMongoError
 from flask import jsonify, request
 from datetime import datetime , timedelta
 
-from flask_jwt_extended import create_access_token , set_access_cookies
+from flask_jwt_extended import create_access_token , set_access_cookies, get_csrf_token
 from ..extention import mongo
 from ..extention import bcrypt
 import json
+
+
 
 ACCESS_EXPIRES = timedelta(hours=1)
 
@@ -73,7 +75,6 @@ def create__user__login():
         email = user_login_details.get('email')
         password = user_login_details.get('password')
 
-        # Check if user exists
         user = mongo.db.auth__schema.find_one({'email': email})
         if not user:
             return jsonify({
@@ -81,7 +82,6 @@ def create__user__login():
                 'message': 'User does not exist!'
             }), 401
 
-        # Check password
         if not bcrypt.check_password_hash(user.get('password'), password):
             return jsonify({
                 'status': False,
@@ -92,27 +92,27 @@ def create__user__login():
             '_id': str(user['_id']),
             'name': user['name'],
             'email': user['email']
-            }
-        access_token = create_access_token(identity=json.dumps(token_data))
+        }
 
-       
+        # access_token = create_access_token(identity=token_data)
+        access_token = create_access_token(
+        identity=token_data["_id"],                  # 👈 sub must be string
+        additional_claims={"user": token_data}      # 👈 put full user data here
+)
+
+        # 👉 extract csrf token from the access token
+        csrf_token = get_csrf_token(access_token)
+
         response = jsonify({
             'status': True,
             'message': 'Logged in successfully!',
-            'token': access_token
+            'csrf_token': csrf_token   # 👈 return it for Postman
         })
+
         set_access_cookies(response, access_token)
-        
         return response, 200
 
     except PyMongoError as e:
-        return jsonify({
-            'status': False,
-            'message': f'Database Error: {str(e)}'
-        }), 500
-
+        return jsonify({'status': False, 'message': f'Database Error: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({
-            'status': False,
-            'message': f'Internal Server Error: {str(e)}'
-        }), 500
+        return jsonify({'status': False, 'message': f'Internal Server Error: {str(e)}'}), 500

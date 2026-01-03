@@ -3,6 +3,7 @@ from flask import jsonify,request
 from pymongo.errors import PyMongoError
 
 from bson import ObjectId
+from flask import g
 
 from ..schema.product__schema import ProductSchema
 
@@ -10,15 +11,28 @@ from ..extention import mongo
 
 from datetime import datetime
 from ..autn_middleware.auth__middleware import auth__required
+from ..autn_middleware.cloudinary_upload import cloudinary_upload
 # products ye ek table name hai aap yaha se kuch bhi de sakte hot database me is name ka collection ban jayega 
 
 from flask_jwt_extended import jwt_required , get_jwt_identity , get_jwt
 
-
+@auth__required
+@jwt_required()
+@cloudinary_upload("image")
 def create__product():
+    name = request.form.get("name")
+    price = request.form.get("price")
+    desc = request.form.get("desc")
+    user_id = get_jwt_identity()
+    
+    image = g.cloudinary_file
     try:
-        data = request.get_json()
-        
+        data = {
+            "name": name,
+            "price": price,
+            "desc": desc,
+            "image_url": image["url"],
+        }
         name = data.get("name")
         if not name:
             return jsonify({
@@ -37,6 +51,7 @@ def create__product():
 
         data["createdAt"] = now
         data["updatedAt"] = now
+        data["userId"] = user_id
 
         mongo.db.ProductSchema.insert_one(data)
         return jsonify({"status": True, "message": "Data inserted successfully"}), 200
@@ -54,9 +69,6 @@ def create__product():
 @jwt_required()
 @auth__required
 def findAll__product():
-    user_id = get_jwt_identity()   # <-- user _id
-    claims = get_jwt() 
-    print(user_id)
     try:
          products = mongo.db.ProductSchema.find()
          return jsonify({
