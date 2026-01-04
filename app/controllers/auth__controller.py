@@ -2,7 +2,7 @@ from pymongo.errors import PyMongoError
 from flask import jsonify, request
 from datetime import datetime , timedelta
 
-from flask_jwt_extended import create_access_token , set_access_cookies, get_csrf_token
+from flask_jwt_extended import create_access_token, create_refresh_token, set_refresh_cookies , set_access_cookies, get_csrf_token, jwt_required, get_jwt_identity
 from ..extention import mongo
 from ..extention import bcrypt
 import json
@@ -10,6 +10,7 @@ import json
 
 
 ACCESS_EXPIRES = timedelta(hours=1)
+REFRESH_EXPIRES = timedelta(days=7)
 
 
 def create__user__registration():
@@ -94,25 +95,59 @@ def create__user__login():
             'email': user['email']
         }
 
-        # access_token = create_access_token(identity=token_data)
         access_token = create_access_token(
-        identity=token_data["_id"],                  # 👈 sub must be string
-        additional_claims={"user": token_data}      # 👈 put full user data here
-)
+            identity=token_data["_id"],
+            additional_claims={"user": token_data},
+            expires_delta=ACCESS_EXPIRES
+        )
 
-        # 👉 extract csrf token from the access token
+        refresh_token = create_refresh_token(
+            identity=token_data["_id"],
+            additional_claims={"user": token_data},
+            expires_delta=REFRESH_EXPIRES
+        )
+
         csrf_token = get_csrf_token(access_token)
 
         response = jsonify({
             'status': True,
             'message': 'Logged in successfully!',
-            'csrf_token': csrf_token   # 👈 return it for Postman
+            'csrf_token': csrf_token
         })
 
         set_access_cookies(response, access_token)
+        set_refresh_cookies(response, refresh_token)
+
         return response, 200
 
     except PyMongoError as e:
         return jsonify({'status': False, 'message': f'Database Error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'status': False, 'message': f'Internal Server Error: {str(e)}'}), 500
+
+
+@jwt_required(refresh=True)
+def refresh__token():
+    try:
+        user_id = get_jwt_identity()
+
+        new_access_token = create_access_token(
+            identity=user_id,
+            expires_delta=ACCESS_EXPIRES
+        )
+
+        csrf_token = get_csrf_token(new_access_token)
+
+        response = jsonify({
+            'status': True,
+            'message': "Access token refreshed successfully!",
+            'csrf_token': csrf_token
+        })
+
+        set_access_cookies(response, new_access_token)
+        return response, 200
+
+    except Exception as e:
+        return jsonify({'status': False, 'message': str(e)}), 500
+    
+    
